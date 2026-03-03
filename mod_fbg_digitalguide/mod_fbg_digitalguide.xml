@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="module" version="3.8" client="site" method="upgrade">
+	<name>FBG Digital Guide</name>
+	<creationDate>2026-03-03</creationDate>
+	<author>Falkenbergs kommun</author>
+	<authorEmail>utveckling@falkenberg.se</authorEmail>
+	<authorUrl>falkenberg.se</authorUrl>
+	<copyright>2026</copyright>
+	<license>NA</license>
+	<version>1.0.0</version>
+	<description>RAG-baserad sök- och frågebesvaringstjänst mot Qdrant vektordatabas. Användaren kan söka på nyckelord eller ställa en fråga och få ett AI-sammanfattat svar med källhänvisningar.</description>
+
+	<files>
+		<filename module="mod_fbg_digitalguide">mod_fbg_digitalguide.php</filename>
+		<filename>helper.php</filename>
+		<folder>tmpl</folder>
+		<folder>assets</folder>
+		<filename>mod_fbg_digitalguide.xml</filename>
+	</files>
+
+	<config>
+		<fields name="params">
+			<fieldset name="basic" label="Grundinställningar">
+				<field
+					name="heading"
+					type="text"
+					label="Rubrik"
+					description="Rubrik som visas ovanför sökfältet (lämna tomt för ingen rubrik)"
+					default="Digital Guide"
+				/>
+				<field
+					name="placeholder"
+					type="text"
+					label="Placeholder-text i sökfältet"
+					default="Sök eller ställ en fråga..."
+				/>
+				<field
+					name="collections"
+					type="text"
+					label="Qdrant-collections (kommaseparerat)"
+					description="Vilka collections som ska genomsökas, t.ex. buf-digitalisering,fokus-ai,unikum-guider"
+					default="buf-digitalisering,fokus-ai,unikum-guider"
+				/>
+				<field
+					name="top_k"
+					type="text"
+					label="Antal träffar per collection"
+					description="Hur många dokument som hämtas från varje collection (rekommenderat: 5)"
+					default="5"
+					filter="integer"
+				/>
+				<field
+					name="show_sources"
+					type="radio"
+					label="Visa källdokument"
+					description="Visa källhänvisningar under svaret"
+					default="1"
+					layout="joomla.form.field.radio.switcher"
+				>
+					<option value="1">Ja</option>
+					<option value="0">Nej</option>
+				</field>
+			</fieldset>
+
+			<fieldset name="api" label="API-inställningar">
+				<field
+					name="qdrant_url"
+					type="text"
+					label="Qdrant-server URL"
+					description="URL till Qdrant-instansen"
+					default="https://qdrant.utvecklingfalkenberg.se"
+				/>
+				<field
+					name="qdrant_api_key"
+					type="text"
+					label="Qdrant API-nyckel"
+					description="API-nyckel för autentisering mot Qdrant"
+					filter="raw"
+					size="80"
+					default=""
+				/>
+				<field
+					name="openai_api_key"
+					type="text"
+					label="OpenAI API-nyckel"
+					description="API-nyckel för OpenAI (embeddings + chat) – klistras in i sin helhet"
+					filter="raw"
+					size="80"
+					default=""
+				/>
+				<field
+					name="embedding_model"
+					type="text"
+					label="Embedding-modell"
+					description="OpenAI-modell för att generera vektorembeddings"
+					default="text-embedding-3-large"
+				/>
+				<field
+					name="chat_model"
+					type="text"
+					label="Chat-modell"
+					description="OpenAI-modell för att generera svar"
+					default="gpt-5.2-chat-latest"
+				/>
+			</fieldset>
+
+			<fieldset name="advanced">
+				<field
+					name="moduleclass_sfx"
+					type="text"
+					label="COM_MODULES_FIELD_MODULECLASS_SFX_LABEL"
+					description="COM_MODULES_FIELD_MODULECLASS_SFX_DESC"
+				/>
+			</fieldset>
+		</fields>
+	</config>
+</extension>

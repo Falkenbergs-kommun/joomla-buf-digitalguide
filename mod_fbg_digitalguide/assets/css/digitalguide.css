@@ -1,0 +1,369 @@
+/**
+ * FBG Digital Guide – Stilar
+ *
+ * Designad för YOOtheme Pro / UIkit 3.
+ * Använder UIkit-klasser i största möjliga mån och
+ * minimerar egna CSS-regler.
+ *
+ * @package FBG Digital Guide
+ */
+
+/* ── Container ─────────────────────────────────────────────────────────── */
+
+.mod-fbg-digitalguide {
+	container-type: inline-size;
+}
+
+/* ── Rubrik ─────────────────────────────────────────────────────────────── */
+
+.fbg-dg-heading-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 1.1rem;
+	font-weight: 600;
+	color: inherit;
+}
+
+.fbg-dg-heading-icon {
+	opacity: 0.65;
+	flex-shrink: 0;
+}
+
+/* ── Sökfält ─────────────────────────────────────────────────────────────── */
+
+.fbg-dg-search-wrapper {
+	margin-bottom: 4px;
+}
+
+/* Input och knapp är direkta flex-syskon → align-items: stretch ger samma höjd */
+.fbg-dg-search-row {
+	display: flex;
+	align-items: stretch;
+}
+
+.fbg-dg-input {
+	flex: 1 1 auto;
+	min-height: 44px;          /* WCAG 2.5.5 – minsta träffyta */
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
+	border-right: none;
+}
+
+.fbg-dg-input:focus {
+	outline: 2px solid currentColor;
+	outline-offset: -2px;
+}
+
+.fbg-dg-input--invalid {
+	border-color: #f0506e !important;
+	animation: fbg-shake 0.3s ease;
+}
+
+@keyframes fbg-shake {
+	0%, 100% { transform: translateX(0); }
+	25%       { transform: translateX(-4px); }
+	75%       { transform: translateX(4px); }
+}
+
+.fbg-dg-btn {
+	flex-shrink: 0;
+	min-width: 44px;           /* WCAG 2.5.5 – minsta träffyta */
+	padding: 0 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+	/* Höjden styrs av syskonelementet (input) via align-items: stretch */
+}
+
+.fbg-dg-btn:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
+}
+
+.fbg-dg-hint {
+	font-size: 0.8rem;
+	margin-top: 6px;
+}
+
+/* ── Laddar ──────────────────────────────────────────────────────────────── */
+
+.fbg-dg-loading {
+	padding: 12px 0 4px;
+}
+
+/* ── Svarspanel ──────────────────────────────────────────────────────────── */
+
+.fbg-dg-result {
+	margin-top: 16px;
+}
+
+.fbg-dg-answer {
+	background: #f8f9fa;
+	border-left: 3px solid #1e87f0;
+	border-radius: 4px;
+	padding: 16px 18px;
+}
+
+.fbg-dg-answer-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 10px;
+}
+
+.fbg-dg-answer-label {
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: #1e87f0;
+}
+
+.fbg-dg-copy-btn {
+	background: none;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	padding: 3px 6px;
+	cursor: pointer;
+	color: #999;
+	transition: color 0.15s, border-color 0.15s;
+	line-height: 1;
+}
+
+.fbg-dg-copy-btn:hover {
+	color: #555;
+	border-color: #ccc;
+}
+
+.fbg-dg-copy-btn--copied {
+	color: #32d296;
+	border-color: #32d296;
+}
+
+/* ── Streaming-cursor ────────────────────────────────────────────────────── */
+
+.fbg-dg-cursor {
+	display: inline-block;
+	width: 2px;
+	height: 1.1em;
+	background-color: #1e87f0;
+	vertical-align: text-bottom;
+	margin-left: 1px;
+	border-radius: 1px;
+	animation: fbg-blink 0.75s step-end infinite;
+}
+
+@keyframes fbg-blink {
+	0%, 100% { opacity: 1; }
+	50%       { opacity: 0; }
+}
+
+/* ── Svarets textinnehåll ────────────────────────────────────────────────── */
+
+.fbg-dg-answer-text {
+	line-height: 1.65;
+	color: inherit;
+}
+
+.fbg-dg-answer-text p {
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+.fbg-dg-answer-text p:last-child {
+	margin-bottom: 0;
+}
+
+.fbg-dg-answer-text h3,
+.fbg-dg-answer-text h4,
+.fbg-dg-answer-text h5 {
+	margin-top: 1em;
+	margin-bottom: 0.4em;
+	font-weight: 600;
+}
+
+.fbg-dg-answer-text ul,
+.fbg-dg-answer-text ol {
+	padding-left: 1.4em;
+	margin-bottom: 0.75em;
+}
+
+.fbg-dg-answer-text li {
+	margin-bottom: 0.3em;
+}
+
+.fbg-dg-answer-text code {
+	background: rgba(0, 0, 0, 0.06);
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-family: monospace;
+	font-size: 0.9em;
+}
+
+/* ── Källor ──────────────────────────────────────────────────────────────── */
+
+.fbg-dg-sources {
+	margin-top: 16px;
+}
+
+.fbg-dg-sources-label {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.fbg-dg-sources-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.fbg-dg-source-item {
+	background: #fff;
+	border: 1px solid #e5e5e5;
+	border-radius: 4px;
+	padding: 10px 14px;
+	margin-bottom: 8px;
+}
+
+.fbg-dg-source-meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 4px;
+}
+
+.fbg-dg-collection-badge {
+	display: inline-block;
+	background: #eef5fd;
+	color: #1e87f0;
+	font-size: 0.72rem;
+	font-weight: 600;
+	padding: 2px 8px;
+	border-radius: 20px;
+	white-space: nowrap;
+}
+
+.fbg-dg-score {
+	font-size: 0.72rem;
+	font-weight: 600;
+	padding: 2px 6px;
+	border-radius: 3px;
+}
+
+.fbg-dg-score--high {
+	background: #d5f0e0;
+	color: #1a8a4a;
+}
+
+.fbg-dg-score--medium {
+	background: #fff3d0;
+	color: #9a6f00;
+}
+
+.fbg-dg-score--low {
+	background: #f5f5f5;
+	color: #777;
+}
+
+.fbg-dg-source-title {
+	font-size: 0.85rem;
+	font-weight: 500;
+	margin-bottom: 3px;
+	color: #333;
+}
+
+.fbg-dg-source-title a {
+	color: #1e87f0;
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+}
+
+.fbg-dg-source-title a:hover {
+	text-decoration: underline;
+}
+
+.fbg-dg-source-snippet {
+	font-size: 0.8rem;
+	color: #666;
+	line-height: 1.5;
+}
+
+/* ── Ny sökning / retry ──────────────────────────────────────────────────── */
+
+.fbg-dg-new-search-row {
+	display: flex;
+	gap: 8px;
+}
+
+/* ── Felpanel ────────────────────────────────────────────────────────────── */
+
+.fbg-dg-error .uk-alert {
+	margin-bottom: 10px;
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+}
+
+/* ── Mörkt tema (om webbplatsen har det) ─────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+	.fbg-dg-answer {
+		background: rgba(255, 255, 255, 0.05);
+	}
+
+	.fbg-dg-source-item {
+		background: rgba(255, 255, 255, 0.04);
+		border-color: rgba(255, 255, 255, 0.12);
+	}
+
+	.fbg-dg-source-title {
+		color: #e0e0e0;
+	}
+
+	.fbg-dg-source-snippet {
+		color: #aaa;
+	}
+
+	.fbg-dg-collection-badge {
+		background: rgba(30, 135, 240, 0.15);
+	}
+}
+
+/* ── Responsiv: smal container ───────────────────────────────────────────── */
+
+@container (max-width: 480px) {
+	.fbg-dg-btn-text {
+		display: none;
+	}
+
+	.fbg-dg-source-meta {
+		flex-wrap: wrap;
+	}
+}
+
+/* ── Utskrift ────────────────────────────────────────────────────────────── */
+
+@media print {
+	.fbg-dg-search-wrapper,
+	.fbg-dg-loading,
+	.fbg-dg-new-search-row,
+	.fbg-dg-copy-btn,
+	.fbg-dg-error {
+		display: none !important;
+	}
+
+	.fbg-dg-answer {
+		border: 1px solid #ccc;
+		background: none;
+	}
+}

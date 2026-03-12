@@ -13,16 +13,8 @@ defined('_JEXEC') or die;
 
 <div class="mod-fbg-digitalguide<?php echo $moduleclass_sfx ? ' ' . $moduleclass_sfx : ''; ?>">
 
-	<?php if ($heading) : ?>
-	<div class="fbg-dg-heading-row uk-margin-small-bottom">
-		<span uk-icon="icon: search; ratio: 1.2" class="fbg-dg-heading-icon"></span>
-		<span class="fbg-dg-heading-text"><?php echo $heading; ?></span>
-	</div>
-	<?php endif; ?>
-
 	<!-- Search form -->
 	<div class="fbg-dg-search-wrapper" role="search">
-		<label for="fbg-dg-input" class="uk-visible-sr"><?php echo $placeholder; ?></label>
 		<div class="fbg-dg-search-row">
 			<input
 				type="search"
@@ -39,9 +31,6 @@ defined('_JEXEC') or die;
 			>
 				<span uk-icon="icon: arrow-right; ratio: 1.1"></span>
 			</button>
-		</div>
-		<div class="fbg-dg-hint uk-text-muted uk-text-small uk-margin-small-top">
-			Skriv ett nyckelord för att söka, eller ställ en fråga för ett sammanfattande svar.
 		</div>
 	</div>
 

@@ -19,7 +19,6 @@ require_once __DIR__ . '/helper.php';
 
 // Get module parameters
 $moduleclass_sfx = htmlspecialchars($params->get('moduleclass_sfx', ''));
-$heading         = htmlspecialchars($params->get('heading', 'Digitalguiden'));
 $placeholder     = htmlspecialchars($params->get('placeholder', 'Sök eller ställ en fråga...'));
 $showSources     = (int)$params->get('show_sources', 1);
 

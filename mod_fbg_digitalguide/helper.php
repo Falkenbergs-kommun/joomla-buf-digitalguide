@@ -404,8 +404,15 @@ class ModFbgDigitalguideHelper
 	private static function extractUrl($payload)
 	{
 		foreach (['source_url', 'url', 'link', 'source'] as $field) {
-			if (!empty($payload[$field]) && is_string($payload[$field]) && filter_var($payload[$field], FILTER_VALIDATE_URL)) {
-				return $payload[$field];
+			if (!empty($payload[$field]) && is_string($payload[$field])) {
+				$url = $payload[$field];
+				// Percent-encode non-ASCII chars so FILTER_VALIDATE_URL accepts IRIs
+				$encoded = preg_replace_callback('/[^\x20-\x7E]/', function ($m) {
+					return rawurlencode($m[0]);
+				}, $url);
+				if (filter_var($encoded, FILTER_VALIDATE_URL)) {
+					return $url;
+				}
 			}
 		}
 

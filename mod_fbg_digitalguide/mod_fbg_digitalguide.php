@@ -26,7 +26,7 @@ $showSources     = (int)$params->get('show_sources', 1);
 $document = Factory::getDocument();
 
 // Load module-specific JavaScript and CSS
-$document->addScript('/modules/mod_fbg_digitalguide/assets/js/digitalguide.js?v=1');
+$document->addScript('/modules/mod_fbg_digitalguide/assets/js/digitalguide.js?v=2');
 $document->addStyleSheet('/modules/mod_fbg_digitalguide/assets/css/digitalguide.css?v=2');
 
 // Pass configuration to JavaScript
@@ -34,6 +34,7 @@ $document->addScriptDeclaration("
 	var fbgDigitalguideConfig = {
 		ajaxUrl: '" . Uri::root() . "index.php?option=com_ajax&module=fbg_digitalguide&format=json',
 		streamUrl: '/modules/mod_fbg_digitalguide/stream.php',
+		moduleId: " . (int)$module->id . ",
 		showSources: " . ($showSources ? 'true' : 'false') . "
 	};
 ");

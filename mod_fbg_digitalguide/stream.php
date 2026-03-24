@@ -56,11 +56,20 @@ try {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
 
-    $prefix = $jConfig->dbprefix;
-    $stmt   = $pdo->prepare(
-        "SELECT params FROM `{$prefix}modules` WHERE module = 'mod_fbg_digitalguide' AND published = 1 LIMIT 1"
-    );
-    $stmt->execute();
+    $prefix   = $jConfig->dbprefix;
+    $moduleId = isset($_POST['module_id']) ? (int)$_POST['module_id'] : 0;
+
+    if ($moduleId > 0) {
+        $stmt = $pdo->prepare(
+            "SELECT params FROM `{$prefix}modules` WHERE id = :id AND module = 'mod_fbg_digitalguide' AND published = 1 LIMIT 1"
+        );
+        $stmt->execute([':id' => $moduleId]);
+    } else {
+        $stmt = $pdo->prepare(
+            "SELECT params FROM `{$prefix}modules` WHERE module = 'mod_fbg_digitalguide' AND published = 1 LIMIT 1"
+        );
+        $stmt->execute();
+    }
     $params = json_decode($stmt->fetchColumn() ?: '{}', true);
 
 } catch (\Exception $e) {

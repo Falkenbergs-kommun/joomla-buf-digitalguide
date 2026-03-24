@@ -81,6 +81,9 @@
 
 		var formData = new FormData();
 		formData.append('question', query);
+		if (fbgDigitalguideConfig.moduleId) {
+			formData.append('module_id', fbgDigitalguideConfig.moduleId);
+		}
 
 		var fullText    = '';
 		var streamDone  = false;

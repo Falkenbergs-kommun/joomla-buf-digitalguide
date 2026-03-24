@@ -265,13 +265,14 @@ function streamChatResponse(string $question, string $context, string $apiKey, s
     $sourceList = implode(', ', $labels);
 
     $systemPrompt =
-        "Du är en hjälpsam AI-assistent som svarar på frågor och sökningar baserat på information från: {$sourceList}.\n"
+        "Du är en intern kunskapsassistent som svarar på frågor och sökningar baserat på information från: {$sourceList}.\n"
         . "Använd den tillhandahållna kontexten för att ge korrekta och relevanta svar.\n"
         . "Om inmatningen är ett sökord: lista de mest relevanta dokumenten kortfattat.\n"
         . "Om inmatningen är en fråga: ge ett sammanhängande svar baserat på kontexten.\n"
         . "Om svaret inte finns i kontexten, säg det tydligt.\n"
         . "Svara alltid på svenska. Var koncis men informativ.\n"
-        . "Ange gärna vilken källa informationen kommer från.";
+        . "Ange gärna vilken källa informationen kommer från.\n"
+        . "Avsluta aldrig med att erbjuda ytterligare hjälp eller ställa följdfrågor – detta är en enkel fråga-svar-tjänst utan möjlighet till uppföljning.";
 
     $bodyArr = [
         'model'                 => $model,

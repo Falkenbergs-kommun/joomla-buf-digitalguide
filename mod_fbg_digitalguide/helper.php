@@ -327,13 +327,14 @@ class ModFbgDigitalguideHelper
 		$labels     = array_map([self::class, 'getCollectionLabel'], $collections);
 		$sourceList = implode(', ', $labels);
 
-		return "Du är en hjälpsam AI-assistent som svarar på frågor och sökningar baserat på information från följande kunskapsbaser: $sourceList.\n"
+		return "Du är en intern kunskapsassistent som svarar på frågor och sökningar baserat på information från följande kunskapsbaser: $sourceList.\n"
 			. "Använd den tillhandahållna kontexten för att ge korrekta och relevanta svar.\n"
 			. "Om inmatningen är ett enstaka nyckelord eller en kort fras (sökning): presentera de mest relevanta dokumenten i en kortfattad lista med vad de handlar om.\n"
 			. "Om inmatningen är en fråga: ge ett sammanhängande, informativt svar baserat på kontexten.\n"
 			. "Om svaret inte finns i kontexten: säg det tydligt istället för att gissa.\n"
 			. "Svara alltid på svenska. Var koncis men informativ.\n"
-			. "Ange gärna vilken källa ($sourceList) informationen kommer från.";
+			. "Ange gärna vilken källa ($sourceList) informationen kommer från.\n"
+			. "Avsluta aldrig med att erbjuda ytterligare hjälp eller ställa följdfrågor – detta är en enkel fråga-svar-tjänst utan möjlighet till uppföljning.";
 	}
 
 	/**

@@ -48,16 +48,34 @@ Streaming-vägen (stream.php) är primär och används av JS. `com_ajax`-vägen 
 ### RAG-pipeline (samma logik i båda filerna)
 
 1. `generateEmbedding()` – OpenAI Embeddings API → float-vektor
-2. `searchAllCollections()` – Qdrant `/points/search` per collection, sortera efter score
-3. `buildContext()` – formatera träffar till LLM-kontext
+2. `searchAllCollections()` – Qdrant `/points/search` per collection, sedan hybrid-ranking (se nedan)
+3. `buildContext()` – sortera per prio→score, formatera till LLM-kontext med tier-etikett
 4. `streamChatResponse()` / `generateChatResponse()` – OpenAI Chat (stream: true i stream.php)
+
+### Priority-aware hybrid-ranking
+
+Varje Qdrant-punkt bär `priority` (1/2/3) som stämplas av crawlern utifrån redaktionellt Google-ark. Lokala källor (prio 1+2) ska dominera AI-sammanfattningen utan att helt utesluta nationella (prio 3). Tre mekanismer i `searchAllCollections`:
+
+1. **Score-boost** (`PRIORITY_BOOST = [1=>1.20, 2=>1.10, 3=>1.00]`) — effective_score = cosine × boost. Ger lokalt fördel utan att svälta nationella hög-relevans-träffar (78 × 1.00 slår fortfarande 62 × 1.20).
+2. **Reserverade platser** (`RESERVED_LOCAL_SLOTS = 3`, `MIN_LOCAL_SCORE = 0.40`) — de tre översta platserna i slutresultatet reserveras för bästa prio 1/2-träffar förutsatt att deras råa score ≥ 0.40. Garanterar att lokala alltid finns i AI-kontexten.
+3. **Kontext-ordning** (`buildContext` sorterar per prio→score) — LLM grundar svaret starkare i tidigt presenterade dokument, så lokala riktlinjer kommer först i prompten.
+
+Konstanterna ligger på filtopp i `stream.php` (top-level `const` är **inte** hissad i PHP — måste deklareras före main flow) och i `helper.php` som klasskonstanter.
+
+Systemprompten innehåller: *"Utgå i första hand från lokala riktlinjer och lokala källor. Använd nationella källor som komplement för nationella regler eller när lokala källor inte täcker frågan."*
+
+`priority`-fältet defaultar till 2 (neutral) om saknas i payload — så gamla punkter utan stämpel beter sig som tidigare.
 
 ### Qdrant payload-fält
 
-Alla tre collections (`buf-digitalisering`, `fokus-ai`, `unikum-guider`) har:
+Alla collections har:
 - `text` – dokumentets innehåll
 - `page_title` – titel (används i källlistan)
 - `source_url` – URL (görs klickbar i källlistan)
+- `priority` – heltal 1/2/3 från crawler-config (saknas → behandlas som 2)
+- `chunk_index` – används som dedup-nyckel i ranking-logiken
+
+Source-svaret till klienten inkluderar `priority` och `priority_label` ("lokal riktlinje" / "lokal källa" / "nationell källa") så frontend kan visa märkning om man vill.
 
 ### JavaScript-flöde (digitalguide.js)
 

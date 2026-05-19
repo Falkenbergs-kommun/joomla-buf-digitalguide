@@ -25,6 +25,19 @@ header('Cache-Control: no-cache, no-store');
 header('X-Accel-Buffering: no');   // Stäng av nginx-buffring
 header('Connection: keep-alive');
 
+// ── Priority-aware ranking constants ─────────────────────────────────────
+// Måste deklareras ovanför main flow eftersom PHP-top-level `const` inte hissas
+// (till skillnad från funktionsdefinitioner). Annars kraschar searchAllCollections.
+//
+// Boost: lokala källor får mjuk fördel; nationella får ingen straff. En hög-relevans
+// nationell träff (cosine 0.85) slår fortfarande lokal medel-relevans (0.62 * 1.20 = 0.74).
+const PRIORITY_BOOST       = [1 => 1.20, 2 => 1.10, 3 => 1.00];
+const PRIORITY_DEFAULT     = 2;
+// Antal platser som reserveras för lokala (prio 1+2) träffar förutsatt att deras
+// råa score är minst MIN_LOCAL_SCORE — garanterar inkludering i AI-sammanfattningen.
+const RESERVED_LOCAL_SLOTS = 3;
+const MIN_LOCAL_SCORE      = 0.40;
+
 // ── Validering ────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     sendEvent('error', ['message' => 'Endast POST-begäran tillåten.']);
@@ -83,7 +96,7 @@ $openaiKey   = $params['openai_api_key']        ?? '';
 $embModel    = $params['embedding_model']       ?? 'text-embedding-3-large';
 $chatModel   = $params['chat_model']            ?? 'gpt-5.2-chat-latest';
 $topK        = max(1, (int)($params['top_k']    ?? 5));
-$collectStr  = $params['collections']           ?? 'buf-digitalisering,fokus-ai,unikum-guider';
+$collectStr  = $params['collections']           ?? 'fokus-ai,unikum-guider,digitalguidenstdochresurser,utskrift,digitalguiden,skollagen,skolverket';
 $collections = array_filter(array_map('trim', explode(',', $collectStr)));
 
 if (empty($openaiKey) || empty($qdrantKey)) {
@@ -169,6 +182,12 @@ function searchQdrant(string $collection, array $embedding, int $limit, string $
     return $data['result'] ?? [];
 }
 
+function extractPriority(array $payload): int
+{
+    $p = $payload['priority'] ?? PRIORITY_DEFAULT;
+    return is_numeric($p) ? (int)$p : PRIORITY_DEFAULT;
+}
+
 function searchAllCollections(array $embedding, array $collections, int $topK, string $qdrantUrl, string $qdrantKey): array
 {
     $all = [];
@@ -176,20 +195,51 @@ function searchAllCollections(array $embedding, array $collections, int $topK, s
     foreach ($collections as $col) {
         try {
             foreach (searchQdrant($col, $embedding, $topK, $qdrantUrl, $qdrantKey) as $r) {
-                $all[] = ['collection' => $col, 'score' => $r['score'], 'payload' => $r['payload']];
+                $prio       = extractPriority($r['payload']);
+                $boost      = PRIORITY_BOOST[$prio] ?? 1.0;
+                $all[] = [
+                    'collection'      => $col,
+                    'score'           => $r['score'],
+                    'effective_score' => $r['score'] * $boost,
+                    'priority'        => $prio,
+                    'payload'         => $r['payload'],
+                ];
             }
         } catch (\Exception $e) {
             error_log("FBG Digital Guide: Fel vid sökning i \"{$col}\": " . $e->getMessage());
         }
     }
 
-    usort($all, fn ($a, $b) => $b['score'] <=> $a['score']);
-    return array_slice($all, 0, $topK * 2);
+    // Stabil nyckel per träff för dedupliceringen nedan
+    $resultKey = fn ($r) => ($r['payload']['source_url'] ?? '') . '#' . ($r['payload']['chunk_index'] ?? '');
+
+    // Garanterad inkludering: reservera platser för bästa lokala träffarna
+    // (prio 1+2) som klarar minimitröskeln för relevans. Detta säkerställer
+    // att lokala källor alltid hamnar i AI-sammanfattningen även när Skolverket
+    // m.fl. har högre råa cosine-värden.
+    $local = array_filter(
+        $all,
+        fn ($r) => $r['priority'] <= 2 && $r['score'] >= MIN_LOCAL_SCORE
+    );
+    usort($local, fn ($a, $b) => $b['effective_score'] <=> $a['effective_score']);
+    $reserved     = array_slice($local, 0, RESERVED_LOCAL_SLOTS);
+    $reservedKeys = array_flip(array_map($resultKey, $reserved));
+
+    // Övriga sorteras på effective_score, exkludera redan reserverade
+    $rest = array_filter($all, fn ($r) => !isset($reservedKeys[$resultKey($r)]));
+    usort($rest, fn ($a, $b) => $b['effective_score'] <=> $a['effective_score']);
+
+    return array_slice(array_merge($reserved, $rest), 0, $topK * 2);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
 // Kontext och källformatering
 // ════════════════════════════════════════════════════════════════════════════
+
+function priorityLabel(int $prio): string
+{
+    return [1 => 'lokal riktlinje', 2 => 'lokal källa', 3 => 'nationell källa'][$prio] ?? 'källa';
+}
 
 function buildContext(array $results): string
 {
@@ -197,11 +247,25 @@ function buildContext(array $results): string
         return 'Ingen relevant information hittades i kunskapsbasen.';
     }
 
+    // Sortera per prio (lägst nummer först = viktigast), sedan score.
+    // LLM tenderar att grunda sitt svar starkare i tidigt presenterade dokument,
+    // så lokala riktlinjer kommer först i kontexten även när nationella har
+    // högre cosine.
+    $ordered = $results;
+    usort($ordered, function ($a, $b) {
+        $pa = $a['priority'] ?? PRIORITY_DEFAULT;
+        $pb = $b['priority'] ?? PRIORITY_DEFAULT;
+        if ($pa !== $pb) return $pa <=> $pb;
+        return $b['score'] <=> $a['score'];
+    });
+
     $ctx = "Relevant information från kunskapsbasen:\n\n";
-    foreach ($results as $i => $r) {
+    foreach ($ordered as $i => $r) {
         $label    = getCollectionLabel($r['collection']);
+        $prio     = $r['priority'] ?? PRIORITY_DEFAULT;
+        $tier     = priorityLabel($prio);
         $relevans = round($r['score'] * 100, 1);
-        $ctx .= "--- Dokument " . ($i + 1) . " (Källa: {$label}, relevans: {$relevans}%) ---\n";
+        $ctx .= "--- Dokument " . ($i + 1) . " (Källa: {$label}, {$tier}, relevans: {$relevans}%) ---\n";
         $ctx .= extractText($r['payload']) . "\n\n";
     }
 
@@ -211,11 +275,14 @@ function buildContext(array $results): string
 function formatSources(array $results): array
 {
     return array_map(function ($r) {
-        $p = $r['payload'];
+        $p    = $r['payload'];
+        $prio = $r['priority'] ?? PRIORITY_DEFAULT;
         return [
             'collection'       => $r['collection'],
             'collection_label' => getCollectionLabel($r['collection']),
             'score'            => round($r['score'] * 100, 1),
+            'priority'         => $prio,
+            'priority_label'   => priorityLabel($prio),
             'title'            => extractTitle($p),
             'url'              => extractUrl($p),
             'snippet'          => extractSnippet($p),
@@ -265,9 +332,15 @@ function extractSnippet(array $p, int $max = 200): string
 function getCollectionLabel(string $col): string
 {
     return [
-        'buf-digitalisering' => 'BUF Digitalisering',
-        'fokus-ai'           => 'Fokus AI',
-        'unikum-guider'      => 'Unikum Guider',
+        'fokus-ai'                     => 'Fokus AI',
+        'unikum-guider'                => 'Unikum Guider',
+        'digitalguidenstdochresurser'  => 'Digitalguiden stöd och resurser',
+        'utskrift'                     => 'Utskrifter',
+        'digitalguiden'                => 'Digitalguiden',
+        'skollagen'                    => 'Skollagen',
+        'skolverket'                   => 'Skolverket',
+        'vardhandboken'                => 'Vårdhandboken',
+        'evolution'                    => 'Evolution',
     ][$col] ?? ucwords(str_replace('-', ' ', $col));
 }
 
@@ -286,6 +359,10 @@ function streamChatResponse(string $question, string $context, string $apiKey, s
         . "Om inmatningen är ett sökord: lista de mest relevanta dokumenten kortfattat.\n"
         . "Om inmatningen är en fråga: ge ett sammanhängande svar baserat på kontexten.\n"
         . "Om svaret inte finns i kontexten, säg det tydligt.\n"
+        . "Källorna är markerade med tier (lokal riktlinje / lokal källa / nationell källa). "
+        . "Utgå i första hand från lokala riktlinjer och lokala källor. "
+        . "Använd nationella källor (t.ex. Skolverket, Skollagen, SPSM) som komplement när frågan rör nationella regler "
+        . "eller när lokala källor inte täcker frågan.\n"
         . "Svara alltid på svenska. Var koncis men informativ.\n"
         . "Ange gärna vilken källa informationen kommer från.\n"
         . "Avsluta aldrig med att erbjuda ytterligare hjälp eller ställa följdfrågor – detta är en enkel fråga-svar-tjänst utan möjlighet till uppföljning.";

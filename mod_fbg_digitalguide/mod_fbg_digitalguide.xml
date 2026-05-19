@@ -38,8 +38,8 @@
 					name="collections"
 					type="text"
 					label="Qdrant-collections (kommaseparerat)"
-					description="Vilka collections som ska genomsökas, t.ex. buf-digitalisering,fokus-ai,unikum-guider"
-					default="buf-digitalisering,fokus-ai,unikum-guider"
+					description="Vilka collections som ska genomsökas, t.ex. fokus-ai,unikum-guider,digitalguiden,skolverket"
+					default="fokus-ai,unikum-guider,digitalguidenstdochresurser,utskrift,digitalguiden,skollagen,skolverket"
 				/>
 				<field
 					name="top_k"

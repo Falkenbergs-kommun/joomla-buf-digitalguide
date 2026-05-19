@@ -22,6 +22,24 @@ use Joomla\Registry\Registry;
 
 class ModFbgDigitalguideHelper
 {
+	// Priority-aware ranking constants — speglar stream.php.
+	// Lokala källor (prio 1+2) får mjuk boost; nationella (prio 3) får ingen straff.
+	const PRIORITY_BOOST = [1 => 1.20, 2 => 1.10, 3 => 1.00];
+	const PRIORITY_DEFAULT = 2;
+	const RESERVED_LOCAL_SLOTS = 3;
+	const MIN_LOCAL_SCORE = 0.40;
+
+	private static function extractPriority(array $payload): int
+	{
+		$p = $payload['priority'] ?? self::PRIORITY_DEFAULT;
+		return is_numeric($p) ? (int)$p : self::PRIORITY_DEFAULT;
+	}
+
+	private static function priorityLabel(int $prio): string
+	{
+		return [1 => 'lokal riktlinje', 2 => 'lokal källa', 3 => 'nationell källa'][$prio] ?? 'källa';
+	}
+
 	/**
 	 * Search Qdrant collections and generate a RAG answer.
 	 * AJAX endpoint: &method=search
@@ -47,7 +65,7 @@ class ModFbgDigitalguideHelper
 			$embeddingModel = $params->get('embedding_model', 'text-embedding-3-large');
 			$chatModel      = $params->get('chat_model', 'gpt-5.2-chat-latest');
 			$topK           = max(1, (int)$params->get('top_k', 5));
-			$collectionsStr = $params->get('collections', 'buf-digitalisering,fokus-ai,unikum-guider');
+			$collectionsStr = $params->get('collections', 'fokus-ai,unikum-guider,digitalguidenstdochresurser,utskrift,digitalguiden,skollagen,skolverket');
 			$collections    = array_filter(array_map('trim', explode(',', $collectionsStr)));
 
 			if (empty($qdrantApiKey) || empty($openaiApiKey)) {
@@ -72,10 +90,13 @@ class ModFbgDigitalguideHelper
 
 			// Format sources for the response (max 5 shown)
 			$sources = array_map(function ($result) {
+				$prio = $result['priority'] ?? self::PRIORITY_DEFAULT;
 				return [
 					'collection'       => $result['collection'],
 					'collection_label' => self::getCollectionLabel($result['collection']),
 					'score'            => round($result['score'] * 100, 1),
+					'priority'         => $prio,
+					'priority_label'   => self::priorityLabel($prio),
 					'snippet'          => self::extractSnippet($result['payload']),
 					'title'            => self::extractTitle($result['payload']),
 					'url'              => self::extractUrl($result['payload']),
@@ -228,10 +249,14 @@ class ModFbgDigitalguideHelper
 				$results = self::searchQdrant($collection, $embedding, $topK, $qdrantUrl, $qdrantApiKey);
 
 				foreach ($results as $result) {
+					$prio  = self::extractPriority($result['payload']);
+					$boost = self::PRIORITY_BOOST[$prio] ?? 1.0;
 					$allResults[] = [
-						'collection' => $collection,
-						'score'      => $result['score'],
-						'payload'    => $result['payload'],
+						'collection'      => $collection,
+						'score'           => $result['score'],
+						'effective_score' => $result['score'] * $boost,
+						'priority'        => $prio,
+						'payload'         => $result['payload'],
 					];
 				}
 			} catch (\Exception $e) {
@@ -240,11 +265,22 @@ class ModFbgDigitalguideHelper
 			}
 		}
 
-		// Sort by relevance score descending
-		usort($allResults, fn ($a, $b) => $b['score'] <=> $a['score']);
+		// Garanterad inkludering: reservera platser för bästa lokala träffarna
+		// (prio 1+2) som klarar minimitröskeln för relevans.
+		$resultKey = fn ($r) => ($r['payload']['source_url'] ?? '') . '#' . ($r['payload']['chunk_index'] ?? '');
 
-		// Return top results across all collections (2× topK)
-		return array_slice($allResults, 0, $topK * 2);
+		$local = array_filter(
+			$allResults,
+			fn ($r) => $r['priority'] <= 2 && $r['score'] >= self::MIN_LOCAL_SCORE
+		);
+		usort($local, fn ($a, $b) => $b['effective_score'] <=> $a['effective_score']);
+		$reserved     = array_slice($local, 0, self::RESERVED_LOCAL_SLOTS);
+		$reservedKeys = array_flip(array_map($resultKey, $reserved));
+
+		$rest = array_filter($allResults, fn ($r) => !isset($reservedKeys[$resultKey($r)]));
+		usort($rest, fn ($a, $b) => $b['effective_score'] <=> $a['effective_score']);
+
+		return array_slice(array_merge($reserved, $rest), 0, $topK * 2);
 	}
 
 	/**
@@ -256,13 +292,25 @@ class ModFbgDigitalguideHelper
 			return 'Ingen relevant information hittades i kunskapsbasen.';
 		}
 
+		// Sortera per prio (lägst nummer först), sedan score — så lokala riktlinjer
+		// kommer först i kontexten och LLM grundar sammanfattningen starkare i dem.
+		$ordered = $results;
+		usort($ordered, function ($a, $b) {
+			$pa = $a['priority'] ?? self::PRIORITY_DEFAULT;
+			$pb = $b['priority'] ?? self::PRIORITY_DEFAULT;
+			if ($pa !== $pb) return $pa <=> $pb;
+			return $b['score'] <=> $a['score'];
+		});
+
 		$context = "Relevant information från kunskapsbasen:\n\n";
 
-		foreach ($results as $index => $result) {
+		foreach ($ordered as $index => $result) {
 			$label    = self::getCollectionLabel($result['collection']);
+			$prio     = $result['priority'] ?? self::PRIORITY_DEFAULT;
+			$tier     = self::priorityLabel($prio);
 			$relevans = round($result['score'] * 100, 1);
 
-			$context .= '--- Dokument ' . ($index + 1) . " (Källa: $label, relevans: $relevans%) ---\n";
+			$context .= '--- Dokument ' . ($index + 1) . " (Källa: $label, $tier, relevans: $relevans%) ---\n";
 			$context .= self::extractFullText($result['payload']);
 			$context .= "\n\n";
 		}
@@ -332,6 +380,10 @@ class ModFbgDigitalguideHelper
 			. "Om inmatningen är ett enstaka nyckelord eller en kort fras (sökning): presentera de mest relevanta dokumenten i en kortfattad lista med vad de handlar om.\n"
 			. "Om inmatningen är en fråga: ge ett sammanhängande, informativt svar baserat på kontexten.\n"
 			. "Om svaret inte finns i kontexten: säg det tydligt istället för att gissa.\n"
+			. "Källorna är markerade med tier (lokal riktlinje / lokal källa / nationell källa). "
+			. "Utgå i första hand från lokala riktlinjer och lokala källor. "
+			. "Använd nationella källor (t.ex. Skolverket, Skollagen, SPSM) som komplement när frågan rör nationella regler "
+			. "eller när lokala källor inte täcker frågan.\n"
 			. "Svara alltid på svenska. Var koncis men informativ.\n"
 			. "Ange gärna vilken källa ($sourceList) informationen kommer från.\n"
 			. "Avsluta aldrig med att erbjuda ytterligare hjälp eller ställa följdfrågor – detta är en enkel fråga-svar-tjänst utan möjlighet till uppföljning.";
@@ -343,9 +395,15 @@ class ModFbgDigitalguideHelper
 	public static function getCollectionLabel($collection)
 	{
 		$labels = [
-			'buf-digitalisering' => 'BUF Digitalisering',
-			'fokus-ai'           => 'Fokus AI',
-			'unikum-guider'      => 'Unikum Guider',
+			'fokus-ai'                     => 'Fokus AI',
+			'unikum-guider'                => 'Unikum Guider',
+			'digitalguidenstdochresurser'  => 'Digitalguiden stöd och resurser',
+			'utskrift'                     => 'Utskrifter',
+			'digitalguiden'                => 'Digitalguiden',
+			'skollagen'                    => 'Skollagen',
+			'skolverket'                   => 'Skolverket',
+			'vardhandboken'                => 'Vårdhandboken',
+			'evolution'                    => 'Evolution',
 		];
 
 		return $labels[$collection] ?? ucwords(str_replace('-', ' ', $collection));
